@@ -1,0 +1,10 @@
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+GeometryTypes = "4d00f742-c7ba-57c2-abde-4428a4b178cb"
+LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+MeshIO = "7269a6da-0436-5bbc-96c2-40638cbb6118"
+Meshing = "e6723b4c-ebff-59f1-b4b7-d97aa5274f73"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
