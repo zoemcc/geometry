@@ -7,6 +7,7 @@ using LinearAlgebra
 using CUDA
 #using LightGraphs
 import Makie
+using SparseArrays
 
 
 defaultsamplesregion() = ((60, 60, 60), Rect(Vec(-2,-2,-2), Vec(4,4,4)))
@@ -26,7 +27,7 @@ function gyroid()
     return gy_mesh
 end
 
-spheredist(v) = norm(v - [1, 1, 1]) - 1.0
+spheredist(v) = norm(v) - 1.0
 
 
 function sphere()
@@ -34,8 +35,8 @@ function sphere()
 
     # generate directly using GeometryBasics API
     # Rect specifies the sampling intervals
-    sphere_mesh = Mesh(spheredist, Rect(Vec(0,0,0),Vec(4, 4, 4)),
-                    MarchingCubes(), samples=(50,50,50))
+    sphere_mesh = Mesh(spheredist, Rect(Vec(-1.2,-1.2,-1.2),Vec(2.4, 2.4, 2.4)),
+                    MarchingCubes(), samples=(10,10,10))
 
 
     return sphere_mesh
@@ -190,6 +191,10 @@ end
 
 
 
+function meshview(inmesh, color)
+    return Makie.mesh(inmesh, color=color, axes=false)
+end
+
 function meshview(inmesh)
     return Makie.mesh(inmesh, color=[norm(v) for v in coordinates(inmesh)], axes=false)
 end
@@ -286,4 +291,20 @@ function init()
     return blob2, connecteds #, newblob2
 end
 
+function loadbunny()
+    bunnymeshpre = load("meshes/original/small_bunny.ply")
+    vertspre, tris = coordinates(bunnymeshpre), faces(bunnymeshpre)
+    transformmat = [1 0 0; 0 0 1; 0 1 0]
+    verts = map(vert->Point3{Float32}(transformmat * vert), vertspre)
+
+    return Mesh(verts, tris)
+end
+
+function bunnyeyepot(t::Float64)
+    eyepot = Array(sparsevec(
+        # eyeleft, eyeright, max size, booty, ear left, ear right
+        [1311, 1015, 1430, 680, 568, 747],
+         [Float64(3 * cos(t)), Float64(3 * cos(t)), Float64(0), Float64(-2), Float64(0.5), Float64(0.5)]))
+    return eyepot
+end
 

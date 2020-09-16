@@ -3,6 +3,7 @@ import GeometryBasics.faces
 using FileIO
 using StaticArrays
 using SparseArrays
+using LinearAlgebra
 
 struct HalfEdge
     twin::UInt32
@@ -33,6 +34,12 @@ facetoindex(simplicsurf::SimplicialSurface{<: AbstractPoint}) = simplicsurf.face
 edgevertexadjacency(simplicsurf::SimplicialSurface{<: AbstractPoint}) = simplicsurf.edgevertexadjacency
 faceedgeadjacency(simplicsurf::SimplicialSurface{<: AbstractPoint}) = simplicsurf.faceedgeadjacency
 
+sv(x::Vararg{Integer}) = SVector{length(x), UInt32}(x...)
+sv(x::NTuple{N, Integer}) where N = sv(x...)
+
+sortsv(x::Vararg{Integer}) = sort(sv(x...))
+sortsv(x::NTuple{N, Integer}) where N = sortsv(x...)
+
 struct SurfaceSubset
     vertices::Array{UInt32, 1}
     edges::Array{UInt32, 1}
@@ -56,17 +63,10 @@ end
 buildvertexvector(subset::SurfaceSubset, surface::SimplicialSurface) = buildsubsetvector(subset, surface, vertices)
 buildedgevector(subset::SurfaceSubset, surface::SimplicialSurface) = buildsubsetvector(subset, surface, edges)
 buildfacevector(subset::SurfaceSubset, surface::SimplicialSurface) = buildsubsetvector(subset, surface, faces)
-
-sv(x::Vararg{Integer}) = SVector{length(x), UInt32}(x...)
-sv(x::NTuple{N, Integer}) where N = sv(x...)
-
-sortsv(x::Vararg{Integer}) = sort(sv(x...))
-sortsv(x::NTuple{N, Integer}) where N = sortsv(x...)
+buildallsubsetvectors(subset::SurfaceSubset, surface::SimplicialSurface) = map(x->buildsubsetvector(subset, surface, x), (vertices, edges, faces))
 
 function star(subset::SurfaceSubset, surface::SimplicialSurface)::SurfaceSubset
-    originalvertices = buildvertexvector(subset, surface)
-    originaledges = buildedgevector(subset, surface)
-    originalfaces = buildfacevector(subset, surface)
+    originalvertices, originaledges, originalfaces = buildallsubsetvectors(subset, surface)
     starvertices = originalvertices
     staredges = subsetnormalize(originaledges + edgevertexadjacency(surface) * starvertices)
     starfaces = subsetnormalize(originalfaces + faceedgeadjacency(surface) * staredges)
@@ -75,9 +75,7 @@ function star(subset::SurfaceSubset, surface::SimplicialSurface)::SurfaceSubset
 end
 
 function closure(subset::SurfaceSubset, surface::SimplicialSurface)::SurfaceSubset
-    originalfaces = buildfacevector(subset, surface)
-    originaledges = buildedgevector(subset, surface)
-    originalvertices = buildvertexvector(subset, surface)
+    originalvertices, originaledges, originalfaces = buildallsubsetvectors(subset, surface)
     closurefaces = originalfaces
     closureedges = subsetnormalize(originaledges + faceedgeadjacency(surface)' * closurefaces)
     closurevertices = subsetnormalize(originalvertices + edgevertexadjacency(surface)' * closureedges)
@@ -92,15 +90,10 @@ function link(subset::SurfaceSubset, surface::SimplicialSurface)::SurfaceSubset
 end
 
 function subsetdifference(subset1::SurfaceSubset, subset2::SurfaceSubset, surface::SimplicialSurface)
-    vertices1 = buildvertexvector(subset1, surface)
-    edges1 = buildedgevector(subset1, surface)
-    faces1 = buildfacevector(subset1, surface)
+    subsetvectors1 = buildallsubsetvectors(subset1, surface)
+    subsetvectors2 = buildallsubsetvectors(subset2, surface)
 
-    vertices2 = buildvertexvector(subset2, surface)
-    edges2 = buildedgevector(subset2, surface)
-    faces2 = buildfacevector(subset2, surface)
-
-    return SurfaceSubset(map(tononzeroindices ∘ subsetdifferencehelper, ((vertices1, vertices2), (edges1, edges2), (faces1, faces2)))...)
+    return SurfaceSubset(map(tononzeroindices ∘ subsetdifferencehelper, zip(subsetvectors1, subsetvectors2))...)
 end
 
 subsetnormalize(x::Array{UInt32, 1})::Array{UInt32, 1} = map(a->min(a, one(UInt32)), x)
@@ -201,3 +194,86 @@ function initfortest()
 end
 
 unzip(a) = map(x->getfield.(a, x), fieldnames(eltype(a)))
+
+
+function buildlaplacianoperator(surface::SimplicialSurface{P})::Tuple{SparseMatrixCSC{Float64, Int64}, Array{Float64, 1}} where {P <: AbstractPoint}
+    tris = faces(surface)
+    numtris = length(tris)
+    verts = vertices(surface)
+    numverts = length(verts)
+
+    dualvertareas = zeros(Float64, numverts)
+    laplacianoperatordict = Dict{Tuple{Int64, Int64}, Float64}()
+    for i in 1:numverts
+        laplacianoperatordict[i, i] = Float64(1e-8)
+    end
+
+    vertexpermutations = ((1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1))
+    for i in 1:numtris
+        trivertinds = tris[i]
+        #@show trivertinds
+        triverts = map(ind->verts[ind], trivertinds)
+        #@show triverts, typeof(triverts)
+        #@show triverts[1], typeof(triverts[1])
+
+
+        triarea = norm(cross(triverts[2] - triverts[1], triverts[3] - triverts[1])) / 2
+        #@show triarea
+        for j in 1:3
+            dualvertareas[trivertinds[j]] += Float64(triarea / 3)
+        end
+        for j in 1:6
+            indicesatplay = vertexpermutations[j]
+            primaryvertind = trivertinds[indicesatplay[1]]
+            secondaryvertind = trivertinds[indicesatplay[2]]
+            tertiaryvertind = trivertinds[indicesatplay[3]]
+            #@show primaryvertind, secondaryvertind, tertiaryvertind
+            primaryvert = triverts[indicesatplay[1]]
+            secondaryvert = triverts[indicesatplay[2]]
+            tertiaryvert = triverts[indicesatplay[3]]
+            #@show primaryvert, secondaryvert, tertiaryvert
+
+            cotalpha = cotan(primaryvert - tertiaryvert, secondaryvert - tertiaryvert) / 2
+            #@show cotalpha
+
+            if !haskey(laplacianoperatordict, (primaryvertind, secondaryvertind))
+                laplacianoperatordict[(Int64(primaryvertind), Int64(secondaryvertind))] = -cotalpha
+            else
+                laplacianoperatordict[(Int64(primaryvertind), Int64(secondaryvertind))] -= cotalpha
+            end
+            laplacianoperatordict[(Int64(primaryvertind), Int64(primaryvertind))] += cotalpha
+        end
+    end
+
+    #@show dualvertareas
+    #@show laplacianoperatordict
+    laplacianoperator = sparse(unzip([(row, col, Float64(value)) for ((row, col), value) in laplacianoperatordict])...)
+    #@show laplacianoperator
+
+    return laplacianoperator, dualvertareas
+end
+
+function cotan(v1::AbstractArray{Float32, 1}, v2::AbstractArray{Float32, 1})::Float32
+    cos = sum(v1 .* v2)
+    sin = norm(cross(v1, v2))
+    return cos / (sin + 1e-10)
+end
+
+
+function solvepoissonproblem(surface::SimplicialSurface{P}, potential::Array{Float64, 1}) where {P <: AbstractPoint}
+    lap, dualareas = buildlaplacianoperator(surface)
+    rhs = potential .* dualareas
+    @show size(rhs)
+    @show size(lap)
+    return lap \ rhs
+
+
+end
+
+function normalizetomax(x::Array)
+    fullposx = (x .+ minimum(x))
+    return fullposx ./ maximum(fullposx)
+end
+
+solvenormpoisson(surface, potential) = normalizetomax(solvepoissonproblem(surface, potential))
+
