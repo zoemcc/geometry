@@ -5,7 +5,7 @@ using GeometryBasics
 import GeometryTypes
 using LinearAlgebra
 using CUDA
-using LightGraphs
+#using LightGraphs
 import Makie
 
 
@@ -27,6 +27,7 @@ function gyroid()
 end
 
 spheredist(v) = norm(v - [1, 1, 1]) - 1.0
+
 
 function sphere()
 
