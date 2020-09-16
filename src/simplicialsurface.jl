@@ -107,9 +107,8 @@ subsetnormalize(x::Array{UInt32, 1})::Array{UInt32, 1} = map(a->min(a, one(UInt3
 
 function subsetdifferencehelper(arrs::Tuple{Array{UInt32, 1}, Array{UInt32, 1}})::Array{UInt32, 1}
     (x, y) = arrs
-    xpy = x + y
-    lambdacompare((a, b)) = UInt32((a == one(UInt32)) && !(b == UInt32(2)))
-    return map(lambdacompare, zip(x, xpy))
+    lambdacompare((a, b)) = UInt32((a == one(UInt32)) && (b == zero(UInt32)))
+    return map(lambdacompare, zip(x, y))
 end
 
 function tononzeroindices(x::Array{UInt32, 1})::Array{UInt32, 1}
