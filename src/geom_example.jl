@@ -2,6 +2,7 @@ using Meshing
 using FileIO
 using MeshIO
 using GeometryBasics
+import GeometryBasics
 import GeometryTypes
 using LinearAlgebra
 using CUDA
