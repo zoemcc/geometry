@@ -263,11 +263,7 @@ end
 function solvepoissonproblem(surface::SimplicialSurface{P}, potential::Array{Float64, 1}) where {P <: AbstractPoint}
     lap, dualareas = buildlaplacianoperator(surface)
     rhs = potential .* dualareas
-    @show size(rhs)
-    @show size(lap)
     return lap \ rhs
-
-
 end
 
 function normalizetomax(x::Array)
@@ -276,4 +272,46 @@ function normalizetomax(x::Array)
 end
 
 solvenormpoisson(surface, potential) = normalizetomax(solvepoissonproblem(surface, potential))
+
+function solveheatstep(surface::SimplicialSurface{P}, potential::Array{Float64, 1}, stepsize::Float64) where {P <: AbstractPoint}
+    lap, dualareas = buildlaplacianoperator(surface)
+    numverts = length(dualareas)
+    lhs = spdiagm(numverts, numverts, 0 => dualareas) + stepsize .* lap
+    rhs = potential .* dualareas
+    return lhs \ rhs
+end
+
+function solvecurvatureflowstep(surface::SimplicialSurface{P}, stepsize::Float64) where {P <: AbstractPoint}
+    lap, dualareas = buildlaplacianoperator(surface)
+    numverts = length(dualareas)
+    lhs = spdiagm(numverts, numverts, 0 => dualareas) + stepsize .* lap
+    rhs = dualareas .* convertpointarraytomatrix(vertices(surface))
+    return lhs \ rhs
+end
+
+function convertpointarraytomatrix(pointarray::Array{Point3{Float32}, 1})
+    numverts = length(pointarray)
+    retmat = Array{Float64, 2}(undef, numverts, 3)
+    for i in 1:numverts
+        retmat[i, :] = Float64.(pointarray[i][:])
+    end
+    return retmat
+end
+
+function convertmatrixtopointarray(matrix::Array{Float64, 2})
+    numverts = size(matrix)[1]
+    retarray = Array{Point3{Float32}, 1}(undef, numverts)
+    for i in 1:numverts
+        retarray[i] = Point3{Float32}(Float32.(matrix[i, :]))
+    end
+    return retarray
+end
+
+function updatemeshandsurface(mesh::AbstractMesh, surface::SimplicialSurface{P}, newverts::Array{Float64, 2}) where {P <: AbstractPoint}
+    newvertpoints = convertmatrixtopointarray(newverts)
+    meshcoords = coordinates(mesh)
+    meshcoords .= newvertpoints
+    surfacecoords = vertices(surface)
+    surfacecoords .= newvertpoints
+end
 

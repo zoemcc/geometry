@@ -192,11 +192,11 @@ end
 
 
 function meshview(inmesh, color)
-    return Makie.mesh(inmesh, color=color, axes=false)
+    return Makie.mesh(inmesh, color=color, show_axis=false)
 end
 
 function meshview(inmesh)
-    return Makie.mesh(inmesh, color=[norm(v) for v in coordinates(inmesh)], axes=false)
+    return Makie.mesh(inmesh, color=[norm(v) for v in coordinates(inmesh)], show_axis=false)
 end
 
 
@@ -307,4 +307,12 @@ function bunnyeyepot(t::Float64)
          [Float64(3 * cos(t)), Float64(3 * cos(t)), Float64(0), Float64(-2), Float64(0.5), Float64(0.5)]))
     return eyepot
 end
+
+#begin
+    #p1 = solvepoissonproblem(bs, bunnyeyepot(0.))
+    #for i in 1:100
+        #p1 = solveheatstep(bs, p1, 0.04)
+        #meshview(bunny, p1)
+    #end
+#end
 
