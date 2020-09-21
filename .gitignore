@@ -24,9 +24,9 @@ docs/site/
 Manifest.toml
 
 
-ddg_docs/
-meshes/
-videos/
+ddg_docs/*
+meshes/*
+videos/*
 
 TODO.txt
 
