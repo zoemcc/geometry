@@ -81,6 +81,8 @@ function bunnydance(scene)
         scene.plots[1][:color][] = p2
     end
     return scene
+    # and then ran:
+    # ffmpeg -i generated/bunnydance.mp4 -i audio/umbrella_run_sound_2.wav -map 0:v -map 1:a -c:v copy -shortest mixed/bunnydance_2.mp4
 end
 
 function bunnyeyepot2(t::Float64)
