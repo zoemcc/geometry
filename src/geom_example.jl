@@ -309,6 +309,7 @@ function bunnyeyepot(t::Float64)
     return eyepot
 end
 
+
 #begin
     #p1 = solvepoissonproblem(bs, bunnyeyepot(0.))
     #for i in 1:100

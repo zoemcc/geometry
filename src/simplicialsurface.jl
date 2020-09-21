@@ -266,12 +266,12 @@ function solvepoissonproblem(surface::SimplicialSurface{P}, potential::Array{Flo
     return lap \ rhs
 end
 
-function normalizetomax(x::Array)
+function normalizetozeroone(x::Array)
     fullposx = (x .+ minimum(x))
     return fullposx ./ maximum(fullposx)
 end
 
-solvenormpoisson(surface, potential) = normalizetomax(solvepoissonproblem(surface, potential))
+solvenormpoisson(surface, potential) = normalizetozeroone(solvepoissonproblem(surface, potential))
 
 function solveheatstep(surface::SimplicialSurface{P}, potential::Array{Float64, 1}, stepsize::Float64) where {P <: AbstractPoint}
     lap, dualareas = buildlaplacianoperator(surface)
@@ -287,6 +287,22 @@ function solvecurvatureflowstep(surface::SimplicialSurface{P}, stepsize::Float64
     lhs = spdiagm(numverts, numverts, 0 => dualareas) + stepsize .* lap
     rhs = dualareas .* convertpointarraytomatrix(vertices(surface))
     return lhs \ rhs
+end
+
+function solvewavestep(surface::SimplicialSurface{P}, value::Array{Float64}, valuevelocity::Array{Float64}, forcing::Array{Float64}, frequency::Float64, stepsize::Float64) where {P <: AbstractPoint}
+    lap, dualareas = buildlaplacianoperator(surface)
+    numverts = length(dualareas)
+    lhsinterior =  frequency .* stepsize .* dualareas .* lap 
+    lhs = [I -stepsize .* sparse(I, numverts, numverts)
+           lhsinterior I]
+    rhs = [value .+ forcing
+           valuevelocity] 
+
+    solution = lhs \ rhs
+    valuenext = solution[1:numverts]
+    velocitynext = solution[numverts + 1 : 2 * numverts]
+    return  valuenext, velocitynext
+
 end
 
 function convertpointarraytomatrix(pointarray::Array{Point3{Float32}, 1})
@@ -307,7 +323,7 @@ function convertmatrixtopointarray(matrix::Array{Float64, 2})
     return retarray
 end
 
-function updatemeshandsurface(mesh::AbstractMesh, surface::SimplicialSurface{P}, newverts::Array{Float64, 2}) where {P <: AbstractPoint}
+function updatemeshandsurface!(mesh::AbstractMesh, surface::SimplicialSurface{P}, newverts::Array{Float64, 2}) where {P <: AbstractPoint}
     newvertpoints = convertmatrixtopointarray(newverts)
     meshcoords = coordinates(mesh)
     meshcoords .= newvertpoints
