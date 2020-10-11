@@ -30,6 +30,11 @@ end
 
 spheredist(v) = norm(v) - 1.0
 
+function boxdist(v, b)
+    q = abs.(v) - b
+    return norm(max.(q, 0.0)) + min.(maximum(q), 0.0)
+end
+
 
 function sphere()
 
@@ -136,9 +141,10 @@ function connectedvertices(faces::AbstractArray{NgonFace{3, N}}) where {N <: Int
     return connectedvertexsets
 end
 
-function removesmallcomponents(mesh, connectedvertexsets)
-    maxsize = maximum(length.(connectedvertexsets))
-    biggestcomponent = collect(filter(x -> length(x) == maxsize, connectedvertexsets)[1])
+function removesmallcomponents(mesh, connectedvertexsets; sizetokeep=1)
+    sizessorted = sort(length.(connectedvertexsets))
+    componentsizetokeep = sizessorted[sizetokeep]
+    biggestcomponent = collect(filter(x -> length(x) == componentsizetokeep, connectedvertexsets)[1])
     oldtonew = Dict{UInt32, UInt32}()
     numnewverts = length(biggestcomponent)
     newverts = Array{Point3{Float64}, 1}(undef, numnewverts)
@@ -178,7 +184,7 @@ function removesmallcomponents(mesh, connectedvertexsets)
         
     end
     #@show newfaces
-    newmesh = Mesh(newverts, newfaces)
+    newmesh = GeometryBasics.Mesh(newverts, newfaces)
     return newmesh
     #return biggestcomponent
 
@@ -264,7 +270,7 @@ function mandelbulbdistfunc(numfractaliter::Integer)
             #trap[:, :, :] = min.(trap, vcat(abs.(w), m)) .* (1.0 .- stop_iter) .+ stop_iter .* trap
             m = normsq(w)
             if m > 256.0
-                return -0.001
+                return -0.0005
             end
             #m[:, :, :] = min.(normsq(w), 256.0)
             #m[map(isnan, m)] .= 256.0
