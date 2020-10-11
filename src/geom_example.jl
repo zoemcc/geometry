@@ -264,7 +264,7 @@ function mandelbulbdistfunc(numfractaliter::Integer)
             #trap[:, :, :] = min.(trap, vcat(abs.(w), m)) .* (1.0 .- stop_iter) .+ stop_iter .* trap
             m = normsq(w)
             if m > 256.0
-                break
+                return -0.001
             end
             #m[:, :, :] = min.(normsq(w), 256.0)
             #m[map(isnan, m)] .= 256.0
