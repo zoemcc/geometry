@@ -1,6 +1,8 @@
 using Meshing
 using FileIO
+using Roots
 using MeshIO
+using ForwardDiff
 using GeometryBasics
 import GeometryBasics
 import GeometryTypes
@@ -47,6 +49,62 @@ function sphere()
 
     return sphere_mesh
 end
+
+D(f) = x -> ForwardDiff.derivative(f, x)
+
+linecurve(t) = Point3{Float64}(1., 1., 1.) .* t
+function curvedistgen(curve::Function, mint, maxt; eps=1e-13)
+    function curvedist(p)
+        disttocurve(t) = normsq(curve(t) - p)
+        Ddisttocurve = D(disttocurve)
+        return sqrt(minimum(disttocurve.(find_zeros(Ddisttocurve, mint, maxt))))
+    end
+    return curvedist
+end
+
+function curveofshapes(curve::AbstractArray{Tuple{Point3{Float64}, Float64}, 1}, shapefunc::Function)
+    function innerdistance(v)
+        distances = map(p->shapefunc((v - p[1]) .* (1 / p[2])), curve)
+        return minimum(distances)
+    end
+    return innerdistance
+end
+
+function boundary_triangles(tetrahedra::Array{SimplexFace{4, Int32}, 1})
+    tritonum = Dict{SVector{3, UInt32}, Int}()
+    @show tritonum
+    tritonum[sv(1, 2, 3)] = 1
+    @show tritonum
+
+    tricombinations = [sv(1,2,3), sv(1,2,4), sv(1,3,4), sv(2,3,4)]
+    @show tricombinations
+    @show tricombinations[1]
+    alltris = Array{NgonFace{3, UInt32}, 1}(undef, 0)
+    for (i, tet) in enumerate(tetrahedra)
+        for combination in tricombinations
+            index = sortsv(tet[combination]...)
+            if !haskey(tritonum, index)
+                tritonum[index] = 1
+            else
+                tritonum[index] += 1
+            end
+            tri = NgonFace{3, UInt32}(index...)
+            push!(alltris, tri)
+        end
+    end
+    @show length(tritonum)
+
+    boundarytris = Array{NgonFace{3, UInt32}, 1}(undef, 0)
+    for (key, val) in pairs(tritonum)
+        if val == one(UInt32)
+            tri = NgonFace{3, UInt32}(key...)
+            push!(boundarytris, tri)
+        end
+    end
+
+    return boundarytris, alltris
+end
+
 
 
 function rectGBtoGT(rect::GeometryBasics.HyperRectangle{N, T}) where {N, T <: Number}
@@ -208,7 +266,7 @@ end
 
 
 function normsq(p::AbstractArray{T}) where {T <: Number}
-    return sum(p .^ 2)
+    return sum(p .* p)
 end
 
 function inversesqrt(num::T) where {T <: Number}

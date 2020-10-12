@@ -1,89 +1,124 @@
 import Makie
+using ColorTypes
+using RegionTrees
+using AdaptiveDistanceFields
 using DistMesh
+using Zygote
 using GeometryBasics
 
 include("geom_example.jl")
 include("simplicialsurface.jl")
 
+testp = Point3{Float64}(1., -1., 0.64)
+tau = 2pi
+
 mandeldist = p->-mandelbulbdistfunc(1)(p)
 
-ori = GeometryBasics.Point{3, Float64}(-1.2, -1.2, -1.2)
-wid = GeometryBasics.Point{3, Float64}(2.4, 2.4, 2.4)
+ori = Point3{Float64}(-1.1, -1.1, -1.1)
+wid = Point3{Float64}(2.2, 2.2, 2.2)
+orisv = SVector(ori)
+widsv = SVector(wid)
 #ori = GeometryBasics.Point{3, Float64}(-1.5, -1.5, -1.5)
 #wid = GeometryBasics.Point{3, Float64}(3.0, 3.0, 3.0)
 
 #result = distmesh(mandeldist, HUniform(), 0.04, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
 #result = distmesh(spheredist, HUniform(), 0.1, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
-function curveofshapes(curve::AbstractArray{Tuple{Point3{Float64}, Float64}, 1}, shapefunc::Function)
-    function innerdistance(v)
-        distances = map(p->shapefunc((v - p[1]) .* (1 / p[2])), curve)
-        return minimum(distances)
-    end
-    return innerdistance
-end
+
+outerbox(v) = boxdist(v, Point3{Float64}(0.8, 0.8, 0.8))
+
 boxdistcur(v) = boxdist(v, Point3{Float64}(0.2, 0.2, 0.2))
+
 curve = Array{Tuple{Point3{Float64}, Float64}, 1}(undef, 0)
 push!(curve, (Point3{Float64}(-0.4, -0.4, -0.4), 1.0))
 push!(curve, (Point3{Float64}(0.4, -0.4, -0.4), 0.7))
-push!(curve, (Point3{Float64}(0.4, 0.4, -0.4), 0.4))
+push!(curve, (Point3{Float64}(0.4, 0.4, -0.4), 0.45))
 push!(curve, (Point3{Float64}(0.4, 0.4, 0.4), 0.3))
 multibox = curveofshapes(curve, boxdistcur)
-result = distmesh(multibox, HUniform(), 0.07, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
 
-#Makie.scatter(result.points)
+linecurveextrudedist(v) = curvedistgen(linecurve, -10., 10.)(v) - 0.4
 
-function boundary_triangles(tetrahedra::Array{SimplexFace{4, Int32}, 1})
-    tritonum = Dict{SVector{3, UInt32}, Int}()
-    @show tritonum
-    tritonum[sv(1, 2, 3)] = 1
-    @show tritonum
+linecurveextrude_intersect_box_dist(v) = max(outerbox(v), linecurveextrudedist(v))
 
-    tricombinations = [sv(1,2,3), sv(1,2,4), sv(1,3,4), sv(2,3,4)]
-    @show tricombinations
-    @show tricombinations[1]
-    alltris = Array{NgonFace{3, UInt32}, 1}(undef, 0)
-    for (i, tet) in enumerate(tetrahedra)
-        for combination in tricombinations
-            index = sortsv(tet[combination]...)
-            if !haskey(tritonum, index)
-                tritonum[index] = 1
-            else
-                tritonum[index] += 1
-            end
-            tri = NgonFace{3, UInt32}(index...)
-            push!(alltris, tri)
-        end
-    end
-    @show length(tritonum)
+#=
+function centraldiff(f::Function,p::VT) where VT
+    println("Using our central diff")
+    @show f, VT
+    deps = sqrt(eps(eltype(VT)))
+    dx = (f(p.+VT(deps,0,0)) - f(p.-VT(deps,0,0)))
+    dy = (f(p.+VT(0,deps,0)) - f(p.-VT(0,deps,0)))
+    dz = (f(p.+VT(0,0,deps)) - f(p.-VT(0,0,deps)))
+    grad = VT(dx,dy,dz)./(2deps) #normalize?
 
-    boundarytris = Array{NgonFace{3, UInt32}, 1}(undef, 0)
-    for (key, val) in pairs(tritonum)
-        if val == one(UInt32)
-            tri = NgonFace{3, UInt32}(key...)
-            push!(boundarytris, tri)
-        end
-    end
+end
+=#
 
-    return boundarytris, alltris
+helixcurve(t) = Point3{Number}(0.3*cos(tau * t), 0.3*sin(tau * t), t)
+#helixcurve(t) = Point3{Float64}(0., 0., 1) .* t
+#helixcurvedist = curvedistgen(helixcurve, -10., 10.)
+#disttocurve(t) = normsq(helixcurve(t) - testp)
+#Ddisttocurve = D(disttocurve)
+helixcurveextrudedist(v) = curvedistgen(helixcurve, -10., 10.)(v) - 0.2
+helixcurveextrude_intersect_box_dist(v) = max(outerbox(v), helixcurveextrudedist(v))
+
+# v expensive!!!
+#helixadf = AdaptiveDistanceField(helixcurveextrude_intersect_box_dist, orisv, widsv)
+
+
+weirdcurve(t) = Point3{Number}(0.5*cos(tau * t), 0.5*sin(tau * t), 0.4*cos(2tau*t))
+weirdcurveextrudedist(v) = curvedistgen(weirdcurve, -1.1, 1.1)(v) - 0.125
+weirdcurveextrude_intersect_box_dist(v) = max(outerbox(v), weirdcurveextrudedist(v))
+
+
+begin
+    curdist = helixadf
+    curh0 = 0.015
+
+    fh(v) = 0.05 + (0.5 * curdist(v))
+    result = distmesh(curdist, fh, curh0, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
+    resultouterbox = distmesh(outerbox, HUniform(), 0.5, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
+    #resultouterbox = distmesh(outerbox, HUniform(), 5curh0, DistMeshSetup(); origin=ori, widths=wid, maxiters=2)
+
+    #Makie.scatter(result.points)
+
+    boundarytris, alltris = boundary_triangles(result.tetrahedra)
+    boundarytrisouterbox, alltrisouterbox = boundary_triangles(resultouterbox.tetrahedra)
+
+    boundarymesh = GeometryBasics.Mesh(result.points, boundarytris)
+    boundarymeshouterbox = GeometryBasics.Mesh(resultouterbox.points, boundarytrisouterbox)
+    #vertexsets = connectedvertices(faces(boundarytris))
+    #removedmesh = removesmallcomponents(boundarymesh, vertexsets; sizetokeep=2)
+    #allmesh = GeometryBasics.Mesh(result.points, alltris)
+
+    show_axis = true
+
+    scene = Makie.Scene()
+    Makie.mesh!(scene, boundarymesh, color=[norm(v[1:2]) for v in coordinates(boundarymesh)], show_axis=show_axis)
+
+    Makie.wireframe!(scene, boundarymesh, show_axis=show_axis)
+    Makie.wireframe!(scene, boundarymeshouterbox, show_axis=show_axis, color=RGB(0.8, 0.3, 0.8))
 end
 
-boundarytris, alltris = boundary_triangles(result.tetrahedra)
+#Makie.wireframe!(scene, allmesh)
+#Makie.wireframe!(scene, removedmesh)
+#Makie.mesh!(scene, removedmesh, color=[norm(v[1:2]) for v in coordinates(removedmesh)])
+aleaf = nothing
+outv = nothing
+for leaf in allleaves(adf.root)
+    aleaf = leaf
+    outv = RegionTrees.center(leaf)
+    #outv = hcat(collect(RegionTrees.vertices(leaf.boundary))...)
+    
+end
 
-boundarymesh = GeometryBasics.Mesh(result.points, boundarytris)
-vertexsets = connectedvertices(faces(boundarytris))
-removedmesh = removesmallcomponents(boundarymesh, vertexsets; sizetokeep=2)
-allmesh = GeometryBasics.Mesh(result.points, alltris)
+adfpoints = map(RegionTrees.center, allleaves(helixadf.root))
 
 scene = Makie.Scene()
-Makie.mesh!(scene, boundarymesh, color=[norm(v[1:2]) for v in coordinates(boundarymesh)])
+Makie.scatter!(scene, adfpoints, size=1e-4, color=[norm(v) for v in adfpoints])
 
-Makie.wireframe!(scene, boundarymesh)
-Makie.wireframe!(scene, allmesh)
-Makie.wireframe!(scene, removedmesh)
-Makie.mesh!(scene, removedmesh, color=[norm(v[1:2]) for v in coordinates(removedmesh)])
 
-save("meshes/generated/reallynicespherebigg.stl", boundarymesh)
-mesh = load("meshes/generated/reallynicespherebigg.stl")
+savename = "meshes/generated/superhighreshelix.stl"
+save(savename, boundarymesh)
+mesh = load(savename)
 scene = Makie.Scene()
 Makie.mesh!(scene, mesh, color=[norm(v[1:2]) for v in coordinates(mesh)])
 Makie.wireframe!(scene, mesh)
