@@ -119,6 +119,52 @@ function curvedistgenkdtree(γ::Function, mint, maxt; arc_length_sampling_freq=0
     curvedist, γsampled_points
 end
 
+struct Curve
+    γ::Function
+    mint::Float64
+    maxt::Float64
+end
+
+function curvesdistgenkdtree(γs::Vector{Curve}; arc_length_sampling_freq=0.01)
+    tspan = (mint, maxt)
+
+    t_to_s, s_to_t, γs, sspan = arc_length_parameterization(γ, tspan)
+    mins, maxs = sspan[1:2]
+
+    γsamples = (mins:arc_length_sampling_freq:maxs)
+    γsampled_points = map(γs, γsamples)
+
+    γkdtree = KDTree(γsampled_points)
+
+
+    function curvedist(p)
+        #disttocurvet(t) = normsq(γ(t) - p)
+        #Ddisttocurvet = D(disttocurvet)
+        #Ddisttocurves = Ddisttocurvet ∘ s_to_t
+
+        s_nearest_index, distance = knn(γkdtree, p, 1)
+        #s_nearest = γsamples[s_nearest_index][1]
+        #t_nearest = s_to_t(s_nearest)
+        #s_search_range = (s_nearest - arc_length_sampling_freq, s_nearest + arc_length_sampling_freq)
+        #@show s_search_range
+        #try
+            #t_min = find_zero(Ddisttocurvet, t_nearest; maxevals=100, atol=1e-4, rtol=1e-3)
+            #return sqrt(disttocurvet(t_nearest))
+        distance[1]
+            #=
+        catch e
+            @show t_nearest, s_nearest, s_nearest_index
+            @show p
+            @show disttocurvet(t_nearest)
+            @show e
+            throw(e)
+        end
+        =#
+
+    end
+    curvedist, γsampled_points
+end
+
 function boundary_triangles(tetrahedra::Array{SimplexFace{4, Int32}, 1})
     tritonum = Dict{SVector{3, UInt32}, Int}()
     @show tritonum

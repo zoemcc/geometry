@@ -1,4 +1,5 @@
 begin 
+    using FileIO
     import Makie
     using ColorTypes
     using RegionTrees
@@ -105,9 +106,17 @@ begin
     linecurveextrude_intersect_box_dist(v) = max(outerbox(v), linecurveextrudedist(v))
 end
 
+begin
+    curves = [linecurve]
+    validtimes = [(-1., 1.)]
+    extrusions = [-0.125]
+    uniondistfuncs = [curvedistgenkdtree(curve, tmin, tmax; arc_length_sampling_freq=arc_length_sampling_freq)[1] for (curve, (tmin, tmax)) in zip(curves, validtimes)]
+    uniondist(p) = minimum([uniondistfunc(p) - extrusion for (uniondistfunc, extrusion) in zip(uniondistfuncs, extrusions)])
+
+end
 
 begin
-    curdist = linecurveextrude_intersect_box_dist
+    curdist = uniondist
     curh0 = 0.03
 
     fh(v) = 0.05 + (0.5 * curdist(v))
@@ -166,8 +175,8 @@ adfpoints = map(RegionTrees.center, allleaves(helixadf.root))
 
 
 begin
-    savename = "meshes/generated/superhighreshelix1.stl"
-    save(savename, boundarymesh)
+    #savename = "meshes/generated/superhighreshelix1.stl"
+    #save(savename, boundarymesh)
 end
 begin
     mesh = load(savename)
