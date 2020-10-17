@@ -1,10 +1,3 @@
-using GeometryBasics
-import GeometryBasics.faces
-using FileIO
-using StaticArrays
-using SparseArrays
-using LinearAlgebra
-
 struct HalfEdge
     twin::UInt32
     next::UInt32

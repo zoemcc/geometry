@@ -1,39 +1,60 @@
-import Makie
-using ColorTypes
-using RegionTrees
-using AdaptiveDistanceFields
-using DistMesh
-using Zygote
-using GeometryBasics
+begin 
+    import Makie
+    using ColorTypes
+    using RegionTrees
+    using AdaptiveDistanceFields
+    using DistMesh
+    using Zygote
+    using Roots
+    using GeometryBasics
+    using LinearAlgebra
+    using StaticArrays
+    #using FractalGeometry
+    using ForwardDiff
+    using DifferentialEquations
+    using SparseArrays
+    using Plots
+    import GeometryTypes
+    using NearestNeighbors
+end
 
-include("geom_example.jl")
-include("simplicialsurface.jl")
+begin
+    include("geom_example.jl")
+    include("simplicialsurface.jl")
+end
 
-testp = Point3{Float64}(1., -1., 0.64)
-tau = 2pi
 
-mandeldist = p->-mandelbulbdistfunc(1)(p)
+begin 
+    testp = Point3{Float64}(1., -1., 0.64)
+    const tau = 2pi
+    const τ = tau
+    const TAU = τ
 
-ori = Point3{Float64}(-1.1, -1.1, -1.1)
-wid = Point3{Float64}(2.2, 2.2, 2.2)
-orisv = SVector(ori)
-widsv = SVector(wid)
-#ori = GeometryBasics.Point{3, Float64}(-1.5, -1.5, -1.5)
-#wid = GeometryBasics.Point{3, Float64}(3.0, 3.0, 3.0)
 
-#result = distmesh(mandeldist, HUniform(), 0.04, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
-#result = distmesh(spheredist, HUniform(), 0.1, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
+    ori = Point3{Float64}(-1.1, -1.1, -1.1)
+    wid = Point3{Float64}(2.2, 2.2, 2.2)
+    orisv = SVector(ori)
+    widsv = SVector(wid)
+    #ori = GeometryBasics.Point{3, Float64}(-1.5, -1.5, -1.5)
+    #wid = GeometryBasics.Point{3, Float64}(3.0, 3.0, 3.0)
 
-outerbox(v) = boxdist(v, Point3{Float64}(0.8, 0.8, 0.8))
+    #result = distmesh(mandeldist, HUniform(), 0.04, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
+    #result = distmesh(spheredist, HUniform(), 0.1, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
 
-boxdistcur(v) = boxdist(v, Point3{Float64}(0.2, 0.2, 0.2))
+    outerbox(v) = boxdist(v, Point3{Float64}(0.8, 0.8, 0.8))
 
-curve = Array{Tuple{Point3{Float64}, Float64}, 1}(undef, 0)
-push!(curve, (Point3{Float64}(-0.4, -0.4, -0.4), 1.0))
-push!(curve, (Point3{Float64}(0.4, -0.4, -0.4), 0.7))
-push!(curve, (Point3{Float64}(0.4, 0.4, -0.4), 0.45))
-push!(curve, (Point3{Float64}(0.4, 0.4, 0.4), 0.3))
-multibox = curveofshapes(curve, boxdistcur)
+    boxdistcur(v) = boxdist(v, Point3{Float64}(0.2, 0.2, 0.2))
+    mandeldist = p->-mandelbulbdistfunc(1)(p)
+end
+
+begin 
+    curve = Array{Tuple{Point3{Float64}, Float64}, 1}(undef, 0)
+    push!(curve, (Point3{Float64}(-0.4, -0.4, -0.4), 1.0))
+    push!(curve, (Point3{Float64}(0.4, -0.4, -0.4), 0.7))
+    push!(curve, (Point3{Float64}(0.4, 0.4, -0.4), 0.45))
+    push!(curve, (Point3{Float64}(0.4, 0.4, 0.4), 0.3))
+    multibox = curveofshapes(curve, boxdistcur)
+end
 
 linecurveextrudedist(v) = curvedistgen(linecurve, -10., 10.)(v) - 0.4
 
@@ -52,29 +73,118 @@ function centraldiff(f::Function,p::VT) where VT
 end
 =#
 
-helixcurve(t) = Point3{Number}(0.3*cos(tau * t), 0.3*sin(tau * t), t)
-#helixcurve(t) = Point3{Float64}(0., 0., 1) .* t
-#helixcurvedist = curvedistgen(helixcurve, -10., 10.)
-#disttocurve(t) = normsq(helixcurve(t) - testp)
-#Ddisttocurve = D(disttocurve)
-helixcurveextrudedist(v) = curvedistgen(helixcurve, -10., 10.)(v) - 0.2
-helixcurveextrude_intersect_box_dist(v) = max(outerbox(v), helixcurveextrudedist(v))
+begin 
+    helixcurve(t) = Point3(0.3*cos(tau * t), 0.3*sin(tau * t), t)
+    #helixcurve(t) = Point3{Float64}(0., 0., 1) .* t
+    #helixcurvedist = curvedistgen(helixcurve, -10., 10.)
+    #disttocurve(t) = normsq(helixcurve(t) - testp)
+    #Ddisttocurve = D(disttocurve)
+    helixcurveextrudedist(v) = curvedistgen(helixcurve, -10., 10.)(v) - 0.2
+    helixcurveextrude_intersect_box_dist(v) = max(outerbox(v), helixcurveextrudedist(v))
+end
 
 # v expensive!!!
 #helixadf = AdaptiveDistanceField(helixcurveextrude_intersect_box_dist, orisv, widsv)
 
 
-weirdcurve(t) = Point3{Number}(0.5*cos(tau * t), 0.5*sin(tau * t), 0.4*cos(2tau*t))
-weirdcurveextrudedist(v) = curvedistgen(weirdcurve, -1.1, 1.1)(v) - 0.125
-weirdcurveextrude_intersect_box_dist(v) = max(outerbox(v), weirdcurveextrudedist(v))
+begin 
+    weirdcurve(t) = Point3(0.5*cos(tau * t), 0.5*sin(tau * t), 0.4*cos(2tau*t))
+    weirdcurveextrudedist(v) = curvedistgen(weirdcurve, -0.51, 0.51)(v) - 0.125
+    weirdcurveextrude_intersect_box_dist(v) = max(outerbox(v), weirdcurveextrudedist(v))
+end
+
+
+# DIFFEQ stuff
+#=
+normtangent(f) = t -> norm(ForwardDiff.derivative(f, t))
+
+curcurve = linecurve
+tspan = (0., 1.)
+γ = curcurve
+
+curnorm = normtangent(curcurve)
+
+
+
+t_to_s, s_to_t, γs, sspan = arc_length_parameterization(γ, tspan)
+maxs = sspan[2]
+
+arc_length_sampling_freq = 0.001
+γsamples = (0:arc_length_sampling_freq:maxs)
+γsampled_points = map(γs, γsamples)
+
+
+γkdtree = KDTree(γsampled_points)
+s_nearest_index = knn(γkdtree, testp, 1)[1]
+distan = norm(γsampled_points[s_nearest_index][1] - testp)
+
+s_nearest = γsamples[s_nearest_index][1]
+s_search_range = (s_nearest - arc_length_sampling_freq, s_nearest + arc_length_sampling_freq)
+
+disttocurvet(t) = normsq(γ(t) - testp)
+disttocurves(s) = disttocurvet(s_to_t(s))
+Ddisttocurvet = D(disttocurvet)
+Ddisttocurves = Ddisttocurvet ∘ s_to_t
+
+root = find_zero(Ddisttocurves, s_search_range)
+sqrt(disttocurves(find_zero(Ddisttocurves, s_search_range)))
+=#
+
+arc_length_sampling_freq=0.01
+function curvedistgenkdtree(γ::Function, mint, maxt; arc_length_sampling_freq=arc_length_sampling_freq)
+    tspan = (mint, maxt)
+
+    t_to_s, s_to_t, γs, sspan = arc_length_parameterization(γ, tspan)
+    mins, maxs = sspan[1:2]
+
+    γsamples = (mins:arc_length_sampling_freq:maxs)
+    γsampled_points = map(γs, γsamples)
+
+    γkdtree = KDTree(γsampled_points)
+
+
+    function curvedist(p)
+        disttocurvet(t) = normsq(γ(t) - p)
+        Ddisttocurvet = D(disttocurvet)
+        #Ddisttocurves = Ddisttocurvet ∘ s_to_t
+
+        s_nearest_index, distance = knn(γkdtree, p, 1)
+        #s_nearest = γsamples[s_nearest_index][1]
+        #t_nearest = s_to_t(s_nearest)
+        #s_search_range = (s_nearest - arc_length_sampling_freq, s_nearest + arc_length_sampling_freq)
+        #@show s_search_range
+        try
+            #t_min = find_zero(Ddisttocurvet, t_nearest; maxevals=100, atol=1e-4, rtol=1e-3)
+            #return sqrt(disttocurvet(t_nearest))
+            return distance[1]
+        catch e
+            @show t_nearest, s_nearest, s_nearest_index
+            @show p
+            @show disttocurvet(t_nearest)
+            @show e
+            throw(e)
+        end
+
+    end
+    curvedist, γsampled_points
+end
+
+
+
+begin 
+    linecurvedist, γsampled_points = curvedistgenkdtree(weirdcurve, -0.50, 0.50)
+    linecurveextrudedist(v) = linecurvedist(v) - 0.125
+    linecurveextrude_intersect_box_dist(v) = max(outerbox(v), linecurveextrudedist(v))
+end
 
 
 begin
-    curdist = helixadf
-    curh0 = 0.015
+    curdist = linecurveextrude_intersect_box_dist
+    curh0 = 0.03
 
     fh(v) = 0.05 + (0.5 * curdist(v))
-    result = distmesh(curdist, fh, curh0, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
+    #fh = HUniform()
+    result = distmesh(curdist, HUniform(), curh0, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
     resultouterbox = distmesh(outerbox, HUniform(), 0.5, DistMeshSetup(); origin=ori, widths=wid, maxiters=100)
     #resultouterbox = distmesh(outerbox, HUniform(), 5curh0, DistMeshSetup(); origin=ori, widths=wid, maxiters=2)
 
@@ -96,6 +206,12 @@ begin
 
     Makie.wireframe!(scene, boundarymesh, show_axis=show_axis)
     Makie.wireframe!(scene, boundarymeshouterbox, show_axis=show_axis, color=RGB(0.8, 0.3, 0.8))
+end
+
+begin
+    scene = Makie.Scene()
+    stride = 1000
+    Makie.scatter!(scene, γsampled_points[1:stride:end], show_axis=show_axis, color=[norm(point) for point in γsampled_points[1:stride:end]])
 end
 
 #Makie.wireframe!(scene, allmesh)

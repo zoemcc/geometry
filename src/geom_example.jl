@@ -1,18 +1,3 @@
-using Meshing
-using FileIO
-using Roots
-using MeshIO
-using ForwardDiff
-using GeometryBasics
-import GeometryBasics
-import GeometryTypes
-using LinearAlgebra
-using CUDA
-#using LightGraphs
-import Makie
-using SparseArrays
-
-
 defaultsamplesregion() = ((60, 60, 60), Rect(Vec(-2,-2,-2), Vec(4,4,4)))
 samples, region = defaultsamplesregion()
 
@@ -34,7 +19,7 @@ spheredist(v) = norm(v) - 1.0
 
 function boxdist(v, b)
     q = abs.(v) - b
-    return norm(max.(q, 0.0)) + min.(maximum(q), 0.0)
+    return norm(max.(q, 0)) + min.(maximum(q), 0)
 end
 
 
@@ -62,6 +47,30 @@ function curvedistgen(curve::Function, mint, maxt; eps=1e-13)
     return curvedist
 end
 
+
+function arc_length_parameterization(γ::Function, tspan)
+    normtangentγ(t) = norm(ForwardDiff.derivative(γ, t))
+
+
+    f_t_to_s(s, p, t) = normtangentγ(t)
+    s0 = 0
+    t_to_s_prob = ODEProblem(f_t_to_s, s0, tspan)
+    t_to_s = solve(t_to_s_prob, Tsit5(), reltol=1e-8, abstol=1e-8)
+
+    maxs = t_to_s(1.0)
+
+    f_s_to_t(t, p, s) = 1 / normtangentγ(t)
+    t0 = tspan[1]
+    sspan = (0.0, maxs)
+    s_to_t_prob = ODEProblem(f_s_to_t, t0, sspan)
+    s_to_t = solve(s_to_t_prob, Tsit5(), reltol=1e-8, abstol=1e-8)
+
+    reparamγ(s) = γ(s_to_t(s))
+    t_to_s, s_to_t, reparamγ, (0., maxs)
+end
+
+
+
 function curveofshapes(curve::AbstractArray{Tuple{Point3{Float64}, Float64}, 1}, shapefunc::Function)
     function innerdistance(v)
         distances = map(p->shapefunc((v - p[1]) .* (1 / p[2])), curve)
@@ -73,7 +82,7 @@ end
 function boundary_triangles(tetrahedra::Array{SimplexFace{4, Int32}, 1})
     tritonum = Dict{SVector{3, UInt32}, Int}()
     @show tritonum
-    tritonum[sv(1, 2, 3)] = 1
+    #tritonum[sv(1, 2, 3)] = 1
     @show tritonum
 
     tricombinations = [sv(1,2,3), sv(1,2,4), sv(1,3,4), sv(2,3,4)]
@@ -82,7 +91,7 @@ function boundary_triangles(tetrahedra::Array{SimplexFace{4, Int32}, 1})
     alltris = Array{NgonFace{3, UInt32}, 1}(undef, 0)
     for (i, tet) in enumerate(tetrahedra)
         for combination in tricombinations
-            index = sortsv(tet[combination]...)
+            index = sortsv(tet[combination]...) 
             if !haskey(tritonum, index)
                 tritonum[index] = 1
             else
@@ -94,10 +103,11 @@ function boundary_triangles(tetrahedra::Array{SimplexFace{4, Int32}, 1})
     end
     @show length(tritonum)
 
-    boundarytris = Array{NgonFace{3, UInt32}, 1}(undef, 0)
+    boundarytris = Array{NgonFace{3, OffsetInteger{-1, UInt32}}, 1}(undef, 0)
     for (key, val) in pairs(tritonum)
         if val == one(UInt32)
-            tri = NgonFace{3, UInt32}(key...)
+            offsetkey = OffsetInteger{-1, UInt32}.(key)
+            tri = NgonFace{3, OffsetInteger{-1, UInt32}}(offsetkey...)
             push!(boundarytris, tri)
         end
     end
