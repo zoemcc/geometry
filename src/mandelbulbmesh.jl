@@ -56,9 +56,11 @@ begin
     multibox = curveofshapes(curve, boxdistcur)
 end
 
-linecurveextrudedist(v) = curvedistgen(linecurve, -10., 10.)(v) - 0.4
+begin
+    linecurveextrudedist(v) = curvedistgen(linecurve, -10., 10.)(v) - 0.4
 
-linecurveextrude_intersect_box_dist(v) = max(outerbox(v), linecurveextrudedist(v))
+    linecurveextrude_intersect_box_dist(v) = max(outerbox(v), linecurveextrudedist(v))
+end
 
 #=
 function centraldiff(f::Function,p::VT) where VT
@@ -94,85 +96,11 @@ begin
 end
 
 
-# DIFFEQ stuff
-#=
-normtangent(f) = t -> norm(ForwardDiff.derivative(f, t))
-
-curcurve = linecurve
-tspan = (0., 1.)
-γ = curcurve
-
-curnorm = normtangent(curcurve)
-
-
-
-t_to_s, s_to_t, γs, sspan = arc_length_parameterization(γ, tspan)
-maxs = sspan[2]
-
-arc_length_sampling_freq = 0.001
-γsamples = (0:arc_length_sampling_freq:maxs)
-γsampled_points = map(γs, γsamples)
-
-
-γkdtree = KDTree(γsampled_points)
-s_nearest_index = knn(γkdtree, testp, 1)[1]
-distan = norm(γsampled_points[s_nearest_index][1] - testp)
-
-s_nearest = γsamples[s_nearest_index][1]
-s_search_range = (s_nearest - arc_length_sampling_freq, s_nearest + arc_length_sampling_freq)
-
-disttocurvet(t) = normsq(γ(t) - testp)
-disttocurves(s) = disttocurvet(s_to_t(s))
-Ddisttocurvet = D(disttocurvet)
-Ddisttocurves = Ddisttocurvet ∘ s_to_t
-
-root = find_zero(Ddisttocurves, s_search_range)
-sqrt(disttocurves(find_zero(Ddisttocurves, s_search_range)))
-=#
-
-arc_length_sampling_freq=0.01
-function curvedistgenkdtree(γ::Function, mint, maxt; arc_length_sampling_freq=arc_length_sampling_freq)
-    tspan = (mint, maxt)
-
-    t_to_s, s_to_t, γs, sspan = arc_length_parameterization(γ, tspan)
-    mins, maxs = sspan[1:2]
-
-    γsamples = (mins:arc_length_sampling_freq:maxs)
-    γsampled_points = map(γs, γsamples)
-
-    γkdtree = KDTree(γsampled_points)
-
-
-    function curvedist(p)
-        disttocurvet(t) = normsq(γ(t) - p)
-        Ddisttocurvet = D(disttocurvet)
-        #Ddisttocurves = Ddisttocurvet ∘ s_to_t
-
-        s_nearest_index, distance = knn(γkdtree, p, 1)
-        #s_nearest = γsamples[s_nearest_index][1]
-        #t_nearest = s_to_t(s_nearest)
-        #s_search_range = (s_nearest - arc_length_sampling_freq, s_nearest + arc_length_sampling_freq)
-        #@show s_search_range
-        try
-            #t_min = find_zero(Ddisttocurvet, t_nearest; maxevals=100, atol=1e-4, rtol=1e-3)
-            #return sqrt(disttocurvet(t_nearest))
-            return distance[1]
-        catch e
-            @show t_nearest, s_nearest, s_nearest_index
-            @show p
-            @show disttocurvet(t_nearest)
-            @show e
-            throw(e)
-        end
-
-    end
-    curvedist, γsampled_points
-end
-
 
 
 begin 
-    linecurvedist, γsampled_points = curvedistgenkdtree(weirdcurve, -0.50, 0.50)
+    arc_length_sampling_freq=0.01
+    linecurvedist, γsampled_points = curvedistgenkdtree(weirdcurve, -0.50, 0.50; arc_length_sampling_freq=arc_length_sampling_freq)
     linecurveextrudedist(v) = linecurvedist(v) - 0.125
     linecurveextrude_intersect_box_dist(v) = max(outerbox(v), linecurveextrudedist(v))
 end
@@ -198,6 +126,8 @@ begin
     #vertexsets = connectedvertices(faces(boundarytris))
     #removedmesh = removesmallcomponents(boundarymesh, vertexsets; sizetokeep=2)
     #allmesh = GeometryBasics.Mesh(result.points, alltris)
+end
+begin
 
     show_axis = true
 
@@ -209,14 +139,16 @@ begin
 end
 
 begin
-    scene = Makie.Scene()
-    stride = 1000
+    #scene = Makie.Scene()
+    stride = 1
     Makie.scatter!(scene, γsampled_points[1:stride:end], show_axis=show_axis, color=[norm(point) for point in γsampled_points[1:stride:end]])
 end
 
 #Makie.wireframe!(scene, allmesh)
 #Makie.wireframe!(scene, removedmesh)
 #Makie.mesh!(scene, removedmesh, color=[norm(v[1:2]) for v in coordinates(removedmesh)])
+#=
+begin 
 aleaf = nothing
 outv = nothing
 for leaf in allleaves(adf.root)
@@ -225,16 +157,21 @@ for leaf in allleaves(adf.root)
     #outv = hcat(collect(RegionTrees.vertices(leaf.boundary))...)
     
 end
+end
 
 adfpoints = map(RegionTrees.center, allleaves(helixadf.root))
-
-scene = Makie.Scene()
-Makie.scatter!(scene, adfpoints, size=1e-4, color=[norm(v) for v in adfpoints])
+=#
 
 
-savename = "meshes/generated/superhighreshelix.stl"
-save(savename, boundarymesh)
-mesh = load(savename)
-scene = Makie.Scene()
-Makie.mesh!(scene, mesh, color=[norm(v[1:2]) for v in coordinates(mesh)])
-Makie.wireframe!(scene, mesh)
+
+
+begin
+    savename = "meshes/generated/superhighreshelix1.stl"
+    save(savename, boundarymesh)
+end
+begin
+    mesh = load(savename)
+    scene = Makie.Scene()
+    Makie.mesh!(scene, mesh, color=[norm(v[1:2]) for v in coordinates(mesh)])
+    Makie.wireframe!(scene, mesh)
+end

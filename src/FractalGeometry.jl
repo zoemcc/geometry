@@ -14,6 +14,10 @@ import Makie
 using SparseArrays
 import GeometryBasics.faces
 using StaticArrays
+using NearestNeighbors
+using Plots
+using ForwardDiff
+using DifferentialEquations
 
 include("geom_example.jl")
 include("simplicialsurface.jl")
