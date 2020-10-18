@@ -7,6 +7,7 @@ using MeshIO
 using ForwardDiff
 using GeometryBasics
 import GeometryTypes
+using DistMesh
 using LinearAlgebra
 using CUDA
 #using LightGraphs
@@ -19,6 +20,8 @@ using Plots
 using ForwardDiff
 using DifferentialEquations
 
+include("curves.jl")
+include("distancefields.jl")
 include("geom_example.jl")
 include("simplicialsurface.jl")
 

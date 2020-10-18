@@ -117,7 +117,7 @@ end
 
 begin
     curdist = uniondist
-    curh0 = 0.03
+    curh0 = 0.1
 
     fh(v) = 0.05 + (0.5 * curdist(v))
     #fh = HUniform()
